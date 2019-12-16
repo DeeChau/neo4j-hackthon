@@ -1,0 +1,29 @@
+version: '3.6'
+services:
+  neo4j:
+    hostname: neo4j
+    image: bitnami/neo4j:3
+    # build: 
+    #   context: .
+    #   dockerfile: Dockerfile
+    ports:
+      - '7474:7474'
+      - '7473:7473'
+      - '7687:7687'
+    volumes:
+      - type: volume
+        source: neo4j_data
+        target: /bitnami
+      - type: bind
+        source: ./imports/
+        target: /bitnami/neo4j/import/
+    environment: 
+      - NEO4J_AUTH=neo4j/test
+      - NEO4J_PASSWORD=bitnami
+      - _JAVA_OPTIONS=-Xmx6G
+    command: |
+      nami start --foreground neo4j
+
+volumes:
+  neo4j_data:
+    driver: local
