@@ -1,8 +1,4 @@
-// General loading scheme 
-// - LOAD main labels WITH main identifier
-// - INDEX on these labels' main identifiers
-// Add relationships/properties as fit.
-
+///////////////////////////// Labels /////////////////////////////
 // Merchant - id, name
 USING PERIODIC COMMIT 1000
 LOAD CSV WITH HEADERS FROM "file:///old/merchants.csv" AS row
@@ -27,7 +23,7 @@ CREATE INDEX ON :GoogleCategory(id);
 // UserInfo (User) account_guid,device_platform,fsa
 USING PERIODIC COMMIT 10000
 LOAD CSV WITH HEADERS FROM "file:///user_info.csv" AS row
-CREATE (:User {guid: row.account_guid}); //, devicePlatform: row.device_platform}) // TODO - Merge in AFTER relations
+CREATE (:User {guid: row.account_guid});
 
 CREATE INDEX ON :User(guid);
 
@@ -70,7 +66,7 @@ DROP INDEX ON :FlyerItem(id);
 
 DROP INDEX ON :SearchTerm(query);
 
-// RELATIONSHIPS
+///////////////////////////// RELATIONSHIPS /////////////////////////////
 
 // TODO
 // User <-> Fsa - account_guid,fsa -- TOO SLOW?
@@ -208,7 +204,7 @@ MATCH (f:FlyerItem {id: "457444119"})
 RETURN f
 // Can click into
 
-// Next Best Related Flyer Item:
+// Next Best Related Flyer Item (Categories!):
 MATCH p1=(u1:User {guid: "c4da90dc-6f64-4d40-9c60-4926b27aa61d"})-[:CLICKED]->(fi1:FlyerItem)<-[:CLICKED]-(u2:User)-[c:CLICKED]->(fi2:FlyerItem),
       p2=(fi1)-[:HAS_CATEGORY]->(gc:GoogleCategory)<-[:HAS_CATEGORY]-(fi2)
 WHERE u1 <> u2 AND fi1 <> fi2
@@ -228,7 +224,8 @@ LIMIT 20
 //// FLYERS
 
 // Next 5 Best Flyers:
-MATCH p=(u1:User {guid: "c4da90dc-6f64-4d40-9c60-4926b27aa61d"})-[:OPENED]->(f1:Flyer)<-[:OPENED]-(u2:User)-[o:OPENED]->(f2:Flyer)
+MATCH p=(u1:User {guid: "c4da90dc-6f64-4d40-9c60-4926b27aa61d"})
+  -[:OPENED]->(f1:Flyer)<-[:OPENED]-(u2:User)-[o:OPENED]->(f2:Flyer)
 WHERE u1 <> u2 AND f1 <> f2
 WITH f2, count(toInteger(o.count)) AS opens
 ORDER BY opens DESC
@@ -239,3 +236,24 @@ LIMIT 5
 MATCH p=(f:Flyer {id: "3151300"})-[:HAS_ITEM]->(:FlyerItem)-[:HAS_CATEGORY]->()
 RETURN p
 LIMIT 30
+
+///////////////////////////// NEW STUFF YEAH /////////////////////////////
+// CREATING FULLTEXT INDEX WOOOOOOOOOOOOOOOOOO
+CREATE (:SearchTerm {query: "chicken"});
+CALL db.index.fulltext.createNodeIndex("searchQuery",["SearchTerm"],["query"]);
+
+CALL db.index.fulltext.queryNodes("searchQuery", "chicken") YIELD node, score
+RETURN node.query, score
+LIMIT 10
+
+// MANUALLY make chickens >:)
+MATCH (u:User)-[*0]->()
+WITH u LIMIT 10
+MATCH (st:SearchTerm { query: "chicken" })
+MERGE (st)<-[]-(u)
+
+// Now get first 20 users who have searched for chicken (Arbitrary)
+CALL db.index.fulltext.queryNodes("searchQuery", "'chicken'") YIELD node, score
+MATCH p=((u:User)-[:SEARCHED_FOR]->(st:SearchTerm { query:node.query} ))
+RETURN p
+LIMIt 20
